@@ -50,17 +50,26 @@ def seed_everything(seed):
 def train_model(x_train, y_train, x_validate, y_validate, device):
     model = NeuralAdditiveModel(
         input_size=x_train.shape[-1],
-        shallow_units=nam.data_utils.calculate_n_units(x_train, FLAGS.n_basis_functions, FLAGS.units_multiplier),
-        hidden_units=list(map(int, FLAGS.hidden_units)),
-        shallow_layer=ExULayer if FLAGS.shallow_layer == "exu" else ReLULayer,
-        hidden_layer=ExULayer if FLAGS.hidden_layer == "exu" else ReLULayer,
-        hidden_dropout=FLAGS.dropout,
-        feature_dropout=FLAGS.feature_dropout).to(device)
+        # feature size, 0 is sample and 1 is the feature, this is one iter of torch dataloader
+        output_size=1 if len(y_train.shape)==1 else y_train.shape[-1],
+        shallow_units=nam.data_utils.calculate_n_units(x_train, 1000, 2),
+        # for feature network, it is changing with data and I am not sure why
+        hidden_units=list(map(int, [])),  # for feature network
+        shallow_layer=ExULayer,  # special operational layer designed for this model
+        hidden_layer=ExULayer,
+        hidden_dropout=0.3,
+        feature_dropout=0.0).to(device)
 
     optimizer = torch.optim.AdamW(model.parameters(),
                                   lr=FLAGS.learning_rate,
                                   weight_decay=FLAGS.l2_regularization)
     criterion = nam.metrics.penalized_mse if FLAGS.regression else nam.metrics.penalized_cross_entropy
+    if FLAGS.regression:
+        criterion = nam.metrics.penalized_mse
+    elif len(y_train.shape)==1:
+        nam.metrics.penalized_cross_entropy
+    else:
+        nam.metrics.penalized_cross_entropy_MutiTask
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, gamma=0.995, step_size=1)
 
     train_dataset = TensorDataset(torch.tensor(x_train), torch.tensor(y_train))

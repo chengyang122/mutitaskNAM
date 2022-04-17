@@ -10,6 +10,9 @@ def feature_loss(fnn_out, lambda_=0.):
 def penalized_cross_entropy(logits, truth, fnn_out, feature_penalty=0.):
     return F.binary_cross_entropy_with_logits(logits.view(-1), truth.view(-1)) + feature_loss(fnn_out, feature_penalty)
 
+def penalized_cross_entropy_MutiTask(logits, truth, fnn_out, feature_penalty=0.):
+    loss = torch.nn.CrossEntropyLoss()
+    return loss(logits, truth.argmax(-1)) + feature_loss(fnn_out, feature_penalty)
 
 def penalized_mse(logits, truth, fnn_out, feature_penalty=0.):
     return F.mse_loss(logits.view(-1), truth.view(-1)) + feature_loss(fnn_out, feature_penalty)
@@ -24,11 +27,15 @@ def calculate_metric(logits,
         # return torch.sqrt(F.mse_loss(logits, truths, reduction="none")).mean().item()
         # mean absolute error
         return "MAE", ((logits.view(-1) - truths.view(-1)).abs().sum() / logits.numel()).item()
-    else:
+    elif len(logits.shape) == 1:
         # return sklearn.metrics.roc_auc_score(truths.view(-1).tolist(), torch.sigmoid(logits.view(-1)).tolist())
-        return "accuracy", accuracy(logits, truths)
+        return "accuracy", accuracySingle(logits, truths)
+    else:
+        return "accuracy", accuracyMuti(logits, truths)
 
 
-def accuracy(logits, truths):
+def accuracySingle(logits, truths):
     return (((truths.view(-1) > 0) == (logits.view(-1) > 0.5)).sum() / truths.numel()).item()
 
+def accuracyMuti(logits, truths):
+    return ((logits.argmax(-1)==truths.argmax(-1)).sum()/truths.numel()).item()

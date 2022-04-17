@@ -56,6 +56,7 @@ class FeatureNN(torch.nn.Module):
                  shallow_layer: ActivationLayer = ExULayer,
                  hidden_layer: ActivationLayer = ReLULayer,
                  dropout: float = .5,
+                 output_size = 1
                  ):
         super().__init__()
         self.layers = torch.nn.ModuleList([
@@ -65,7 +66,7 @@ class FeatureNN(torch.nn.Module):
         self.layers.insert(0, shallow_layer(1, shallow_units))
 
         self.dropout = torch.nn.Dropout(p=dropout)
-        self.linear = torch.nn.Linear(shallow_units if len(hidden_units) == 0 else hidden_units[-1], 1, bias=False)
+        self.linear = torch.nn.Linear(shallow_units if len(hidden_units) == 0 else hidden_units[-1], output_size, bias=False)
         torch.nn.init.xavier_uniform_(self.linear.weight)
 
 
@@ -80,6 +81,7 @@ class FeatureNN(torch.nn.Module):
 class NeuralAdditiveModel(torch.nn.Module):
     def __init__(self,
                  input_size: int,
+                 output_size: int, #not one when it is muti class, in sigle class regression and classification it would be 1
                  shallow_units: int,
                  hidden_units: Tuple = (),
                  shallow_layer: ActivationLayer = ExULayer,
@@ -100,17 +102,21 @@ class NeuralAdditiveModel(torch.nn.Module):
                       hidden_units=hidden_units,
                       shallow_layer=shallow_layer,
                       hidden_layer=hidden_layer,
-                      dropout=hidden_dropout)
+                      dropout=hidden_dropout,
+                      output_size=output_size)
             for i in range(input_size)
         ])
         self.feature_dropout = torch.nn.Dropout(p=feature_dropout)
         self.bias = torch.nn.Parameter(torch.zeros(1))
-
-    def forward(self, x):
-        f_out = torch.cat(self._feature_nns(x), dim=-1)
-        f_out = self.feature_dropout(f_out)
-
-        return f_out.sum(axis=-1) + self.bias, f_out
-
+        self.output_size = output_size
     def _feature_nns(self, x):
         return [self.feature_nns[i](x[:, i]) for i in range(self.input_size)]
+
+    def forward(self, x):
+        if self.output_size == 1:
+          f_out = torch.cat(self._feature_nns(x), dim=-1)
+          f_out = self.feature_dropout(f_out)
+        else:
+          f_out = torch.stack(self._feature_nns(x), dim = -1)
+          f_out = self.feature_dropout(f_out)
+        return f_out.sum(axis=-1) + self.bias, f_out

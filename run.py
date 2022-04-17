@@ -74,7 +74,7 @@ def train_model(x_train, y_train, x_validate, y_validate, device):
     for epoch in range(FLAGS.training_epochs):
         model = model.train()
         total_loss = train_one_epoch(model, criterion, optimizer, train_loader, device)
-        logging.info(f"epoch {epoch} | train | {total_loss=}")
+        logging.info(f"epoch {epoch} | train | {total_loss}")
 
         scheduler.step()
 
